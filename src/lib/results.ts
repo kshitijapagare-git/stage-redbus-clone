@@ -11,3 +11,20 @@ export function getRouteBoardingPoints(
 
   return boardingPoints.filter((bp) => bp.cityId === fromCityId)
 }
+
+export function resolveSelectedBoardingPoint(
+  boardingPoints: BoardingPoint[],
+  fromCityId: number,
+  bpParam: string | null,
+): BoardingPoint | null {
+  if (!bpParam) return null
+
+  const bpId = Number(bpParam)
+  if (!Number.isFinite(bpId)) return null
+
+  const boardingPoint = boardingPoints.find((bp) => bp.id === bpId)
+  if (!boardingPoint) return null
+  if (boardingPoint.cityId !== fromCityId) return null
+
+  return boardingPoint
+}

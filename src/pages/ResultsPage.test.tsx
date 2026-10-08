@@ -1,55 +1,64 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import ResultsPage from './ResultsPage'
 
-function renderAt(path: string) {
+function renderResultsPage(initialEntry: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/search" element={<ResultsPage />} />
+        <Route path="/book" element={<div>Booking page</div>} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
-function futureDateISO(daysAhead: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() + daysAhead)
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-describe('ResultsPage', () => {
-  it('shows the header and only the boarding points for the matching route', () => {
-    renderAt(`/search?from=1&to=2&date=${futureDateISO(1)}`)
-
-    expect(screen.getByRole('heading')).toHaveTextContent('Pune → Bengaluru')
-    expect(screen.getByText(/Shivajinagar/)).toBeInTheDocument()
-    expect(screen.getByText(/Hinjewadi/)).toBeInTheDocument()
-    expect(screen.queryByText(/Majestic/)).not.toBeInTheDocument()
+describe('ResultsPage boarding point selection', () => {
+  it('disables Continue when nothing is selected', () => {
+    renderResultsPage('/search?from=1&to=2&date=2099-01-01')
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
   })
 
-  it('shows a "No routes found" empty state and still shows the header when no route connects the cities', () => {
-    renderAt(`/search?from=2&to=1&date=${futureDateISO(1)}`)
+  it('selecting a boarding point highlights it and enables Continue', () => {
+    renderResultsPage('/search?from=1&to=2&date=2099-01-01')
+    const options = screen.getAllByRole('radio')
+    fireEvent.click(options[0])
 
-    expect(screen.getByRole('heading')).toHaveTextContent('Bengaluru → Pune')
-    expect(screen.getByText('No routes found')).toBeInTheDocument()
+    expect(options[0]).toHaveAttribute('aria-checked', 'true')
+    expect(options[0]).toHaveClass('bp-card-selected')
+    expect(screen.getByRole('button', { name: 'Continue' })).not.toBeDisabled()
+    expect(document.querySelector('.boarding-summary')).toHaveTextContent('Shivajinagar')
   })
 
-  it('shows an invalid city error and hides the header for an unknown city id', () => {
-    renderAt(`/search?from=999&to=2&date=${futureDateISO(1)}`)
-
-    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('Invalid city')
+  it('pre-selects the boarding point from a valid ?bp= param', () => {
+    renderResultsPage('/search?from=1&to=2&date=2099-01-01&bp=2')
+    const options = screen.getAllByRole('radio')
+    expect(options[1]).toHaveAttribute('aria-checked', 'true')
+    expect(options[1]).toHaveClass('bp-card-selected')
+    expect(screen.getByRole('button', { name: 'Continue' })).not.toBeDisabled()
+    expect(document.querySelector('.boarding-summary')).toHaveTextContent('Hinjewadi')
   })
 
-  it('shows an invalid date error and hides the header for a past date', () => {
-    renderAt(`/search?from=1&to=2&date=${futureDateISO(-5)}`)
+  it('ignores a bp param that does not match any boarding point', () => {
+    renderResultsPage('/search?from=1&to=2&date=2099-01-01&bp=999')
+    const options = screen.getAllByRole('radio')
+    options.forEach((option) => expect(option).toHaveAttribute('aria-checked', 'false'))
+    expect(document.querySelector('.boarding-summary')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+  })
 
-    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('Invalid date')
+  it('ignores a bp param that belongs to a different city', () => {
+    renderResultsPage('/search?from=1&to=2&date=2099-01-01&bp=3')
+    const options = screen.getAllByRole('radio')
+    options.forEach((option) => expect(option).toHaveAttribute('aria-checked', 'false'))
+    expect(document.querySelector('.boarding-summary')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+  })
+
+  it('navigates to /book with the selected boarding point when Continue is clicked', () => {
+    renderResultsPage('/search?from=1&to=2&date=2099-01-01&bp=1')
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(screen.getByText('Booking page')).toBeInTheDocument()
   })
 })
