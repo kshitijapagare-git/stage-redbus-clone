@@ -14,9 +14,9 @@ function Header() {
           <a className="nav-item active" href="#">
             <span className="nav-icon">🚌</span>Bus tickets
           </a>
-          <a className="nav-item" href="#">
+          <Link className="nav-item" to="/trains">
             <span className="nav-icon">🚆</span>Train tickets
-          </a>
+          </Link>
           <Link className="nav-item" to="/hotels">
             <span className="nav-icon">🛏️</span>Hotels
           </Link>
