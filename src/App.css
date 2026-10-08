@@ -137,8 +137,24 @@ button { font: inherit; cursor: pointer; }
   flex: 0 0 300px; display: flex; align-items: center; gap: 14px; padding: 12px 16px;
   border: 1px solid var(--line); border-radius: 16px; font-size: 18px;
 }
-.women-box a { color: var(--link); text-decoration: underline; font-size: 14px; font-weight: 600; }
+.women-box a,
+.women-know-more {
+  color: var(--link); text-decoration: underline; font-size: 14px; font-weight: 600;
+  border: 0; background: transparent; padding: 0; font-family: inherit;
+}
 .women-icon { font-size: 28px; }
+
+/* Women info dialog */
+.women-info-backdrop {
+  position: fixed; inset: 0; z-index: 20; background: rgb(0 0 0 / 0.4);
+  display: flex; align-items: center; justify-content: center;
+}
+.women-info-panel {
+  position: relative; z-index: 21; width: min(420px, 90vw); background: #fff;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2); border-radius: 16px; padding: 24px;
+}
+.women-info-panel h3 { margin: 0 0 12px; font-size: 18px; font-weight: 700; }
+.women-info-panel p { margin: 0; line-height: 1.5; color: var(--muted); }
 .toggle {
   margin-left: auto; width: 58px; height: 34px; border-radius: 999px; border: 2px solid #333;
   background: #ddd; position: relative; flex-shrink: 0;
@@ -175,6 +191,10 @@ button { font: inherit; cursor: pointer; }
 .results-head { display: flex; justify-content: space-between; align-items: center; margin: 32px 0 18px; }
 .results-head h2 { margin: 0; font-size: 26px; font-weight: 700; }
 .results-head a { color: var(--link); text-decoration: underline; font-weight: 600; }
+.women-badge {
+  background: var(--red-soft); color: var(--red); font-size: 13px; font-weight: 700;
+  padding: 6px 12px; border-radius: 999px; margin-right: auto; margin-left: 16px;
+}
 .results-empty { margin: 24px 0 64px; color: var(--muted); font-size: 16px; }
 .results-error {
   margin: 32px 0 64px; padding: 24px; border: 1px solid var(--line); border-radius: 16px;

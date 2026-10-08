@@ -77,6 +77,23 @@ describe('parseSearchQuery', () => {
   })
 })
 
+describe('buildSearchQueryString', () => {
+  it('appends women=1 when forWomen is true', () => {
+    const qs = buildSearchQueryString({ fromCityId: 1, toCityId: 2, date: '2099-10-02', forWomen: true })
+    expect(qs).toBe('from=1&to=2&date=2099-10-02&women=1')
+  })
+
+  it('omits the women parameter when forWomen is false', () => {
+    const qs = buildSearchQueryString({ fromCityId: 1, toCityId: 2, date: '2099-10-02', forWomen: false })
+    expect(qs).toBe('from=1&to=2&date=2099-10-02')
+  })
+
+  it('omits the women parameter when forWomen is undefined', () => {
+    const qs = buildSearchQueryString({ fromCityId: 1, toCityId: 2, date: '2099-10-02' })
+    expect(qs).toBe('from=1&to=2&date=2099-10-02')
+  })
+})
+
 describe('isPastDate', () => {
   it('returns true for a date before today', () => {
     const today = new Date(2026, 9, 2)

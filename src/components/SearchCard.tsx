@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import CityAutocomplete from './CityAutocomplete'
 import RecentSearches from './RecentSearches'
+import WomenInfoDialog from './WomenInfoDialog'
 import { cities } from '../data'
 import { buildSearchQueryString, isPastDate, parseSearchQuery } from '../lib/searchQuery'
 import {
@@ -11,6 +12,7 @@ import {
   removeRecentSearch,
   type RecentSearch,
 } from '../lib/recentSearches'
+import { loadWomenToggle, persistWomenToggle } from '../lib/womenToggle'
 import type { City } from '../types'
 
 const toISODate = (d: Date) => {
@@ -30,7 +32,9 @@ function SearchCard() {
   tomorrow.setDate(today.getDate() + 1)
   const tomorrowISO = toISODate(tomorrow)
 
-  const [forWomen, setForWomen] = useState(false)
+  const [forWomen, setForWomen] = useState(() => loadWomenToggle())
+  const [isWomenInfoOpen, setIsWomenInfoOpen] = useState(false)
+  const knowMoreRef = useRef<HTMLButtonElement>(null)
 
   const [fromText, setFromText] = useState('')
   const [toText, setToText] = useState('')
@@ -107,6 +111,14 @@ function SearchCard() {
     setSwapVersion((v) => v + 1)
   }
 
+  const handleToggleWomen = () => {
+    setForWomen((prev) => {
+      const next = !prev
+      persistWomenToggle(next)
+      return next
+    })
+  }
+
   const handleDateChange = (value: string) => {
     setDateValue(value)
     if (!value) {
@@ -146,7 +158,7 @@ function SearchCard() {
     setDateError(nextDateError)
 
     if (!nextFromError && !nextToError && !nextDateError && fromCityId !== null && toCityId !== null) {
-      const qs = buildSearchQueryString({ fromCityId, toCityId, date: dateValue })
+      const qs = buildSearchQueryString({ fromCityId, toCityId, date: dateValue, forWomen })
       const updatedRecentSearches = addRecentSearch(recentSearches, { fromCityId, toCityId, date: dateValue })
       setRecentSearches(updatedRecentSearches)
       persistRecentSearches(updatedRecentSearches)
@@ -256,7 +268,14 @@ function SearchCard() {
           <span className="women-icon">👩</span>
           <div>
             <div>Booking for women</div>
-            <a href="#">Know more</a>
+            <button
+              type="button"
+              className="women-know-more"
+              ref={knowMoreRef}
+              onClick={() => setIsWomenInfoOpen(true)}
+            >
+              Know more
+            </button>
           </div>
           <button
             type="button"
@@ -264,7 +283,7 @@ function SearchCard() {
             aria-checked={forWomen}
             aria-label="Booking for women"
             className={`toggle ${forWomen ? 'on' : ''}`}
-            onClick={() => setForWomen((v) => !v)}
+            onClick={handleToggleWomen}
           />
         </div>
       </div>
@@ -276,6 +295,12 @@ function SearchCard() {
         onSelect={handleRecentSelect}
         onRemove={handleRemoveRecent}
         onClearAll={handleClearAllRecent}
+      />
+      <WomenInfoDialog
+        isOpen={isWomenInfoOpen}
+        onClose={() => setIsWomenInfoOpen(false)}
+        triggerRef={knowMoreRef}
+        id="women-info-dialog"
       />
     </div>
   )

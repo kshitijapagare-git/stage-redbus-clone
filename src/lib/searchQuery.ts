@@ -5,6 +5,7 @@ export interface SearchQuery {
   toCityId: number
   /** ISO date string, yyyy-mm-dd */
   date: string
+  forWomen?: boolean
 }
 
 export interface SearchQueryError {
@@ -87,7 +88,8 @@ export function parseSearchQuery(params: URLSearchParams, cities: City[]): Parse
 }
 
 export function buildSearchQueryString(query: SearchQuery): string {
-  return `from=${query.fromCityId}&to=${query.toCityId}&date=${query.date}`
+  const base = `from=${query.fromCityId}&to=${query.toCityId}&date=${query.date}`
+  return query.forWomen ? `${base}&women=1` : base
 }
 
 export function formatShortDate(d: Date): string {

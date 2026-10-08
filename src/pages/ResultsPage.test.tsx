@@ -62,3 +62,20 @@ describe('ResultsPage boarding point selection', () => {
     expect(screen.getByText('Booking page')).toBeInTheDocument()
   })
 })
+
+describe('ResultsPage booking for women label', () => {
+  it('shows the "Booking for women" badge when women=1 is present', () => {
+    renderResultsPage('/search?from=1&to=2&date=2099-01-01&women=1')
+    expect(screen.getByText('Booking for women')).toBeInTheDocument()
+  })
+
+  it('does not show the badge when the women param is absent', () => {
+    renderResultsPage('/search?from=1&to=2&date=2099-01-01')
+    expect(screen.queryByText('Booking for women')).not.toBeInTheDocument()
+  })
+
+  it('does not show the badge when the women param is any value other than "1"', () => {
+    renderResultsPage('/search?from=1&to=2&date=2099-01-01&women=0')
+    expect(screen.queryByText('Booking for women')).not.toBeInTheDocument()
+  })
+})

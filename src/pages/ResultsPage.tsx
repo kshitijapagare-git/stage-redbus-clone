@@ -18,6 +18,7 @@ function ResultsPage() {
   const fromCityId = result.ok ? result.value.fromCityId : null
   const toCityId = result.ok ? result.value.toCityId : null
   const date = result.ok ? result.value.date : null
+  const isForWomen = searchParams.get('women') === '1'
 
   const [selectedBpId, setSelectedBpId] = useState<number | null>(() => {
     if (fromCityId === null) return null
@@ -76,6 +77,7 @@ function ResultsPage() {
         <h2>
           {fromCity?.name} → {toCity?.name} · {formatShortDate(displayDate)}
         </h2>
+        {isForWomen && <span className="women-badge">Booking for women</span>}
         <Link to={modifySearchHref}>Modify search</Link>
       </div>
       {matchingBoardingPoints.length > 0 ? (

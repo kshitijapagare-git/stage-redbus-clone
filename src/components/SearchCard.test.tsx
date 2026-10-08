@@ -1,14 +1,31 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import SearchCard from './SearchCard'
 import { STORAGE_KEY } from '../lib/recentSearches'
+import { WOMEN_TOGGLE_STORAGE_KEY } from '../lib/womenToggle'
 
 function renderSearchCard(initialPath = '/') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/" element={<SearchCard />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+function LocationDisplay() {
+  const location = useLocation()
+  return <div data-testid="location-display">{location.pathname + location.search}</div>
+}
+
+function renderSearchCardWithLocation(initialPath = '/') {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Routes>
+        <Route path="/" element={<SearchCard />} />
+        <Route path="/search" element={<LocationDisplay />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -368,6 +385,99 @@ describe('SearchCard', () => {
     renderSearchCard()
 
     expect(screen.queryByText('Recent searches')).not.toBeInTheDocument()
+  })
+
+  it('defaults the Booking for women toggle to off when nothing is stored', () => {
+    renderSearchCard()
+
+    const toggle = screen.getByRole('switch', { name: 'Booking for women' })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('restores the Booking for women toggle as on when localStorage has "1"', () => {
+    localStorage.setItem(WOMEN_TOGGLE_STORAGE_KEY, '1')
+
+    renderSearchCard()
+
+    const toggle = screen.getByRole('switch', { name: 'Booking for women' })
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('persists the toggle state to localStorage when clicked', () => {
+    renderSearchCard()
+    const toggle = screen.getByRole('switch', { name: 'Booking for women' })
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    expect(localStorage.getItem(WOMEN_TOGGLE_STORAGE_KEY)).toBe('1')
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    expect(localStorage.getItem(WOMEN_TOGGLE_STORAGE_KEY)).toBe('0')
+  })
+
+  it('defaults the toggle to off and still renders when localStorage.getItem throws', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('boom')
+    })
+
+    expect(() => renderSearchCard()).not.toThrow()
+    const toggle = screen.getByRole('switch', { name: 'Booking for women' })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('opens the Know more dialog and closes it via ×, Escape, and the backdrop, restoring focus each time', () => {
+    renderSearchCard()
+    const knowMoreLink = screen.getByRole('button', { name: 'Know more' })
+
+    fireEvent.click(knowMoreLink)
+    expect(screen.getByRole('dialog', { name: 'Booking for women' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(knowMoreLink).toHaveFocus()
+
+    fireEvent.click(knowMoreLink)
+    const dialog = screen.getByRole('dialog', { name: 'Booking for women' })
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(knowMoreLink).toHaveFocus()
+
+    fireEvent.click(knowMoreLink)
+    const dialog2 = screen.getByRole('dialog', { name: 'Booking for women' })
+    fireEvent.click(dialog2.parentElement as HTMLElement)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(knowMoreLink).toHaveFocus()
+  })
+
+  it('includes women=1 in the search URL when the toggle is on', () => {
+    renderSearchCardWithLocation()
+    const fromInput = screen.getByRole('combobox', { name: 'From' })
+    const toInput = screen.getByRole('combobox', { name: 'To' })
+
+    fireEvent.change(fromInput, { target: { value: 'pu' } })
+    fireEvent.click(screen.getByRole('option', { name: /Pune/ }))
+    fireEvent.change(toInput, { target: { value: 'ben' } })
+    fireEvent.click(screen.getByRole('option', { name: /Bengaluru/ }))
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Booking for women' }))
+    fireEvent.click(screen.getByRole('button', { name: '⌕ Search buses' }))
+
+    expect(screen.getByTestId('location-display')).toHaveTextContent('women=1')
+  })
+
+  it('omits the women parameter from the search URL when the toggle is off', () => {
+    renderSearchCardWithLocation()
+    const fromInput = screen.getByRole('combobox', { name: 'From' })
+    const toInput = screen.getByRole('combobox', { name: 'To' })
+
+    fireEvent.change(fromInput, { target: { value: 'pu' } })
+    fireEvent.click(screen.getByRole('option', { name: /Pune/ }))
+    fireEvent.change(toInput, { target: { value: 'ben' } })
+    fireEvent.click(screen.getByRole('option', { name: /Bengaluru/ }))
+
+    fireEvent.click(screen.getByRole('button', { name: '⌕ Search buses' }))
+
+    expect(screen.getByTestId('location-display')).not.toHaveTextContent('women=1')
   })
 })
 
