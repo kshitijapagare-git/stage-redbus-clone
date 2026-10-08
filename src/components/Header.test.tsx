@@ -1,10 +1,19 @@
 import { render, screen, fireEvent, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import Header from './Header'
 
+function renderHeader() {
+  return render(
+    <MemoryRouter>
+      <Header />
+    </MemoryRouter>,
+  )
+}
+
 describe('Header mobile menu', () => {
   it('opens the menu and sets aria-expanded, showing a dialog named "Menu"', () => {
-    render(<Header />)
+    renderHeader()
     const menuButton = screen.getByRole('button', { name: '☰' })
     expect(menuButton).toHaveAttribute('aria-expanded', 'false')
     expect(menuButton).toHaveAttribute('aria-controls')
@@ -18,7 +27,7 @@ describe('Header mobile menu', () => {
   })
 
   it('closes the menu via the × button and returns focus to the ☰ button', () => {
-    render(<Header />)
+    renderHeader()
     const menuButton = screen.getByRole('button', { name: '☰' })
     fireEvent.click(menuButton)
 
@@ -30,7 +39,7 @@ describe('Header mobile menu', () => {
   })
 
   it('closes when the backdrop is clicked but not when the dialog content is clicked', () => {
-    const { container } = render(<Header />)
+    const { container } = renderHeader()
     fireEvent.click(screen.getByRole('button', { name: '☰' }))
 
     const dialog = screen.getByRole('dialog', { name: 'Menu' })
@@ -45,7 +54,7 @@ describe('Header mobile menu', () => {
   })
 
   it('closes when Escape is pressed', () => {
-    render(<Header />)
+    renderHeader()
     fireEvent.click(screen.getByRole('button', { name: '☰' }))
 
     const dialog = screen.getByRole('dialog', { name: 'Menu' })
@@ -55,7 +64,7 @@ describe('Header mobile menu', () => {
   })
 
   it('closes immediately when the Bookings, Help, or Account link is clicked', () => {
-    render(<Header />)
+    renderHeader()
     const menuButton = screen.getByRole('button', { name: '☰' })
 
     fireEvent.click(menuButton)
@@ -72,7 +81,7 @@ describe('Header mobile menu', () => {
   })
 
   it('traps focus inside the dialog, wrapping Tab and Shift+Tab at the boundaries', () => {
-    render(<Header />)
+    renderHeader()
     fireEvent.click(screen.getByRole('button', { name: '☰' }))
 
     const dialog = screen.getByRole('dialog', { name: 'Menu' })

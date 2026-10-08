@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import MobileMenu from './MobileMenu'
 
 function Header() {
@@ -16,9 +17,9 @@ function Header() {
           <a className="nav-item" href="#">
             <span className="nav-icon">🚆</span>Train tickets
           </a>
-          <a className="nav-item" href="#">
+          <Link className="nav-item" to="/hotels">
             <span className="nav-icon">🛏️</span>Hotels
-          </a>
+          </Link>
         </nav>
         <nav className="nav-side">
           <a href="#">☰ Bookings</a>
