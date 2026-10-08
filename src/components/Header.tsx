@@ -1,4 +1,10 @@
+import { useRef, useState } from 'react'
+import MobileMenu from './MobileMenu'
+
 function Header() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+
   return (
     <header className="header">
       <div className="container header-inner">
@@ -19,7 +25,23 @@ function Header() {
           <a href="#">ⓘ Help</a>
           <a href="#">◉ Account</a>
         </nav>
+        <button
+          type="button"
+          className="mobile-menu-btn"
+          aria-expanded={isMenuOpen}
+          aria-controls="mobile-menu-dialog"
+          ref={menuButtonRef}
+          onClick={() => setIsMenuOpen(true)}
+        >
+          ☰
+        </button>
       </div>
+      <MobileMenu
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        triggerRef={menuButtonRef}
+        id="mobile-menu-dialog"
+      />
     </header>
   )
 }
