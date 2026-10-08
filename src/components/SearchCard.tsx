@@ -1,14 +1,27 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import CityAutocomplete from './CityAutocomplete'
 import { cities } from '../data'
+import { buildSearchQueryString, isPastDate, parseSearchQuery } from '../lib/searchQuery'
 import type { City } from '../types'
 
-const formatDate = (d: Date) =>
-  `${String(d.getDate()).padStart(2, '0')} ${d.toLocaleString('en-US', { month: 'short' })}, ${d.getFullYear()}`
+const toISODate = (d: Date) => {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 function SearchCard() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
   const [today] = useState(() => new Date())
-  const [dayOffset, setDayOffset] = useState(0)
+  const todayISO = toISODate(today)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(today.getDate() + 1)
+  const tomorrowISO = toISODate(tomorrow)
+
   const [forWomen, setForWomen] = useState(false)
 
   const [fromText, setFromText] = useState('')
@@ -19,8 +32,28 @@ function SearchCard() {
   const [toError, setToError] = useState<string | undefined>(undefined)
   const [swapVersion, setSwapVersion] = useState(0)
 
-  const date = new Date(today)
-  date.setDate(today.getDate() + dayOffset)
+  const [dateValue, setDateValue] = useState(todayISO)
+  const [dateError, setDateError] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    const result = parseSearchQuery(searchParams, cities)
+    if (!result.ok) return
+
+    const fromCity = cities.find((c) => c.id === result.value.fromCityId)
+    const toCity = cities.find((c) => c.id === result.value.toCityId)
+
+    if (fromCity) {
+      setFromText(fromCity.name)
+      setFromCityId(fromCity.id)
+    }
+    if (toCity) {
+      setToText(toCity.name)
+      setToCityId(toCity.id)
+    }
+    setDateValue(result.value.date)
+    // Prefill only on mount, from whatever query params are present at that time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleFromChange = (text: string) => {
     setFromText(text)
@@ -58,9 +91,21 @@ function SearchCard() {
     setSwapVersion((v) => v + 1)
   }
 
+  const handleDateChange = (value: string) => {
+    setDateValue(value)
+    if (!value) {
+      setDateError('Please select a date')
+    } else if (isPastDate(value, today)) {
+      setDateError('Please select a present or future date')
+    } else {
+      setDateError(undefined)
+    }
+  }
+
   const handleSearchClick = () => {
     let nextFromError: string | undefined
     let nextToError: string | undefined
+    let nextDateError: string | undefined
 
     if (fromCityId === null) {
       nextFromError = 'Please select a city'
@@ -74,8 +119,20 @@ function SearchCard() {
       nextToError = 'From and To must be different'
     }
 
+    if (!dateValue) {
+      nextDateError = 'Please select a date'
+    } else if (isPastDate(dateValue, today)) {
+      nextDateError = 'Please select a present or future date'
+    }
+
     setFromError(nextFromError)
     setToError(nextToError)
+    setDateError(nextDateError)
+
+    if (!nextFromError && !nextToError && !nextDateError && fromCityId !== null && toCityId !== null) {
+      const qs = buildSearchQueryString({ fromCityId, toCityId, date: dateValue })
+      navigate(`/search?${qs}`)
+    }
   }
 
   return (
@@ -113,15 +170,33 @@ function SearchCard() {
             <span className="field-icon">📅</span>
             <div className="date-text">
               <small>Date of Journey</small>
-              <strong>{formatDate(date)}</strong>
-              <em>{dayOffset === 0 ? '(Today)' : '(Tomorrow)'}</em>
+              <input
+                type="date"
+                aria-label="Date of Journey"
+                value={dateValue}
+                min={todayISO}
+                onChange={(e) => handleDateChange(e.target.value)}
+              />
             </div>
-            <button type="button" className={`chip ${dayOffset === 0 ? 'chip-active' : ''}`} onClick={() => setDayOffset(0)}>
+            <button
+              type="button"
+              className={`chip ${dateValue === todayISO ? 'chip-active' : ''}`}
+              onClick={() => handleDateChange(todayISO)}
+            >
               Today
             </button>
-            <button type="button" className={`chip ${dayOffset === 1 ? 'chip-active' : ''}`} onClick={() => setDayOffset(1)}>
+            <button
+              type="button"
+              className={`chip ${dateValue === tomorrowISO ? 'chip-active' : ''}`}
+              onClick={() => handleDateChange(tomorrowISO)}
+            >
               Tomorrow
             </button>
+            {dateError && (
+              <span className="field-error" role="alert">
+                {dateError}
+              </span>
+            )}
           </div>
         </div>
         <div className="women-box">
