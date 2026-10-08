@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import CityAutocomplete from './CityAutocomplete'
+import RecentSearches from './RecentSearches'
 import { cities } from '../data'
 import { buildSearchQueryString, isPastDate, parseSearchQuery } from '../lib/searchQuery'
+import {
+  addRecentSearch,
+  loadRecentSearches,
+  persistRecentSearches,
+  removeRecentSearch,
+  type RecentSearch,
+} from '../lib/recentSearches'
 import type { City } from '../types'
 
 const toISODate = (d: Date) => {
@@ -35,6 +43,8 @@ function SearchCard() {
   const [dateValue, setDateValue] = useState(todayISO)
   const [dateError, setDateError] = useState<string | undefined>(undefined)
 
+  const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([])
+
   useEffect(() => {
     const result = parseSearchQuery(searchParams, cities)
     if (!result.ok) return
@@ -52,6 +62,12 @@ function SearchCard() {
     }
     setDateValue(result.value.date)
     // Prefill only on mount, from whatever query params are present at that time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    setRecentSearches(loadRecentSearches(cities))
+    // Load once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -131,8 +147,45 @@ function SearchCard() {
 
     if (!nextFromError && !nextToError && !nextDateError && fromCityId !== null && toCityId !== null) {
       const qs = buildSearchQueryString({ fromCityId, toCityId, date: dateValue })
+      const updatedRecentSearches = addRecentSearch(recentSearches, { fromCityId, toCityId, date: dateValue })
+      setRecentSearches(updatedRecentSearches)
+      persistRecentSearches(updatedRecentSearches)
       navigate(`/search?${qs}`)
     }
+  }
+
+  const handleRecentSelect = (search: RecentSearch) => {
+    const fromCity = cities.find((c) => c.id === search.fromCityId)
+    const toCity = cities.find((c) => c.id === search.toCityId)
+
+    if (fromCity) {
+      setFromText(fromCity.name)
+      setFromCityId(fromCity.id)
+    }
+    if (toCity) {
+      setToText(toCity.name)
+      setToCityId(toCity.id)
+    }
+    setFromError(undefined)
+    setToError(undefined)
+
+    if (isPastDate(search.date, today)) {
+      setDateValue(todayISO)
+    } else {
+      setDateValue(search.date)
+    }
+    setDateError(undefined)
+  }
+
+  const handleRemoveRecent = (index: number) => {
+    const updated = removeRecentSearch(recentSearches, index)
+    setRecentSearches(updated)
+    persistRecentSearches(updated)
+  }
+
+  const handleClearAllRecent = () => {
+    setRecentSearches([])
+    persistRecentSearches([])
   }
 
   return (
@@ -216,6 +269,14 @@ function SearchCard() {
         </div>
       </div>
       <button type="button" className="search-btn" onClick={handleSearchClick}>⌕ Search buses</button>
+      <RecentSearches
+        cities={cities}
+        searches={recentSearches}
+        today={today}
+        onSelect={handleRecentSelect}
+        onRemove={handleRemoveRecent}
+        onClearAll={handleClearAllRecent}
+      />
     </div>
   )
 }

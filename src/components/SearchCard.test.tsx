@@ -1,13 +1,27 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import SearchCard from './SearchCard'
+import { STORAGE_KEY } from '../lib/recentSearches'
 
 function renderSearchCard(initialPath = '/') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <Routes>
         <Route path="/" element={<SearchCard />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+// For tests that perform multiple searches in a row: SearchCard unmounts when
+// navigating away under the default "/" route, so a catch-all route is used to
+// keep it mounted across repeated searches.
+function renderSearchCardPersistent(initialPath = '/') {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Routes>
+        <Route path="*" element={<SearchCard />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -21,6 +35,14 @@ function toISODate(d: Date): string {
 }
 
 describe('SearchCard', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('stores the selected city id when choosing a suggestion in the From field', () => {
     renderSearchCard()
     const fromInput = screen.getByRole('combobox', { name: 'From' })
@@ -190,4 +212,165 @@ describe('SearchCard', () => {
     expect(fromInput.value).toBe('')
     expect(toInput.value).toBe('')
   })
+
+  it('saves a successful search to localStorage', () => {
+    renderSearchCard()
+    const fromInput = screen.getByRole('combobox', { name: 'From' })
+    const toInput = screen.getByRole('combobox', { name: 'To' })
+
+    fireEvent.change(fromInput, { target: { value: 'pu' } })
+    fireEvent.click(screen.getByRole('option', { name: /Pune/ }))
+    fireEvent.change(toInput, { target: { value: 'ben' } })
+    fireEvent.click(screen.getByRole('option', { name: /Bengaluru/ }))
+
+    fireEvent.click(screen.getByRole('button', { name: '⌕ Search buses' }))
+
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
+    expect(stored).toHaveLength(1)
+    expect(stored[0]).toMatchObject({ fromCityId: 1, toCityId: 2 })
+  })
+
+  it('keeps only one entry when the same route is searched twice', () => {
+    renderSearchCardPersistent()
+    const fromInput = screen.getByRole('combobox', { name: 'From' })
+    const toInput = screen.getByRole('combobox', { name: 'To' })
+
+    for (let i = 0; i < 2; i++) {
+      fireEvent.change(fromInput, { target: { value: 'pu' } })
+      fireEvent.click(screen.getByRole('option', { name: /Pune/ }))
+      fireEvent.change(toInput, { target: { value: 'ben' } })
+      fireEvent.click(screen.getByRole('option', { name: /Bengaluru/ }))
+      fireEvent.click(screen.getByRole('button', { name: '⌕ Search buses' }))
+    }
+
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
+    expect(stored).toHaveLength(1)
+  })
+
+  it('never keeps more than 5 entries after many successful searches', () => {
+    renderSearchCardPersistent()
+    const fromInput = screen.getByRole('combobox', { name: 'From' })
+    const toInput = screen.getByRole('combobox', { name: 'To' })
+
+    for (let i = 0; i < 6; i++) {
+      fireEvent.change(fromInput, { target: { value: 'pu' } })
+      fireEvent.click(screen.getByRole('option', { name: /Pune/ }))
+      fireEvent.change(toInput, { target: { value: 'ben' } })
+      fireEvent.click(screen.getByRole('option', { name: /Bengaluru/ }))
+      fireEvent.click(screen.getByRole('button', { name: '⌕ Search buses' }))
+    }
+
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
+    expect(stored.length).toBeLessThanOrEqual(5)
+  })
+
+  it('fills From, To and date when a non-past recent search is clicked', () => {
+    const first = renderSearchCard()
+    const fromInput = screen.getByRole('combobox', { name: 'From' }) as HTMLInputElement
+    const toInput = screen.getByRole('combobox', { name: 'To' }) as HTMLInputElement
+    const dateInput = screen.getByLabelText('Date of Journey') as HTMLInputElement
+
+    fireEvent.change(fromInput, { target: { value: 'pu' } })
+    fireEvent.click(screen.getByRole('option', { name: /Pune/ }))
+    fireEvent.change(toInput, { target: { value: 'ben' } })
+    fireEvent.click(screen.getByRole('option', { name: /Bengaluru/ }))
+
+    const futureDate = new Date()
+    futureDate.setDate(futureDate.getDate() + 5)
+    const futureISO = toISODate(futureDate)
+    fireEvent.change(dateInput, { target: { value: futureISO } })
+
+    fireEvent.click(screen.getByRole('button', { name: '⌕ Search buses' }))
+    first.unmount()
+
+    // Re-render fresh to pick up the persisted recent search.
+    renderSearchCard()
+    const newFromInput = screen.getByRole('combobox', { name: 'From' }) as HTMLInputElement
+    const newToInput = screen.getByRole('combobox', { name: 'To' }) as HTMLInputElement
+    const newDateInput = screen.getByLabelText('Date of Journey') as HTMLInputElement
+
+    fireEvent.click(screen.getByText(`Pune → Bengaluru · ${formatShortDateForTest(futureDate)}`))
+
+    expect(newFromInput.value).toBe('Pune')
+    expect(newToInput.value).toBe('Bengaluru')
+    expect(newDateInput.value).toBe(futureISO)
+  })
+
+  it('fills From and To but sets today for a past recent search', () => {
+    const past: { fromCityId: number; toCityId: number; date: string } = {
+      fromCityId: 1,
+      toCityId: 2,
+      date: '2000-01-01',
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([past]))
+
+    renderSearchCard()
+    const fromInput = screen.getByRole('combobox', { name: 'From' }) as HTMLInputElement
+    const toInput = screen.getByRole('combobox', { name: 'To' }) as HTMLInputElement
+    const dateInput = screen.getByLabelText('Date of Journey') as HTMLInputElement
+
+    fireEvent.click(screen.getByText(/Pune → Bengaluru · 01 Jan \(Past\)/))
+
+    const today = new Date()
+    expect(fromInput.value).toBe('Pune')
+    expect(toInput.value).toBe('Bengaluru')
+    expect(dateInput.value).toBe(toISODate(today))
+  })
+
+  it('removes only the clicked recent search via ×', () => {
+    const searches = [
+      { fromCityId: 1, toCityId: 2, date: '2099-10-02' },
+      { fromCityId: 2, toCityId: 1, date: '2099-10-03' },
+    ]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(searches))
+
+    renderSearchCard()
+    const removeButtons = screen.getAllByRole('button', { name: /^Remove / })
+    fireEvent.click(removeButtons[0])
+
+    expect(screen.queryByText(/Pune → Bengaluru · 02 Oct/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Bengaluru → Pune · 03 Oct/)).toBeInTheDocument()
+
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
+    expect(stored).toHaveLength(1)
+    expect(stored[0]).toMatchObject({ fromCityId: 2, toCityId: 1 })
+  })
+
+  it('removes all recent searches when "Clear all" is clicked', () => {
+    const searches = [
+      { fromCityId: 1, toCityId: 2, date: '2099-10-02' },
+      { fromCityId: 2, toCityId: 1, date: '2099-10-03' },
+    ]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(searches))
+
+    renderSearchCard()
+    fireEvent.click(screen.getByText('Clear all'))
+
+    expect(screen.queryByText('Recent searches')).not.toBeInTheDocument()
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
+    expect(stored).toHaveLength(0)
+  })
+
+  it('hides the recent searches row and still renders when localStorage.getItem throws', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('boom')
+    })
+
+    expect(() => renderSearchCard()).not.toThrow()
+    expect(screen.queryByText('Recent searches')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '⌕ Search buses' })).toBeInTheDocument()
+  })
+
+  it('drops a saved recent search referencing an unknown city on mount', () => {
+    const searches = [{ fromCityId: 999, toCityId: 2, date: '2099-10-02' }]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(searches))
+
+    renderSearchCard()
+
+    expect(screen.queryByText('Recent searches')).not.toBeInTheDocument()
+  })
 })
+
+function formatShortDateForTest(d: Date): string {
+  return `${String(d.getDate()).padStart(2, '0')} ${d.toLocaleString('en-US', { month: 'short' })}`
+}
